@@ -39,6 +39,7 @@ static int gProgress = 1;
 // num_bits should be 128 or 256 
 // if gVerbose is on it will print the entire key schedule as well 
 // as the constraints--the XOR of words that should XOR to 0
+// Verboseがオンの場合、キースケジュール全体と制約（0とXORする必要がある単語のXOR）が出力されます。
 static void print_key(uint32_t* map, int num_bits, size_t address)
 {
     if (gVerbose) {
@@ -94,7 +95,7 @@ static void print_key(uint32_t* map, int num_bits, size_t address)
 // Simple entropy test
 //
 // Returns true if the 176 bytes starting at location bmap[i] contain
-// more than 8 repeats of any byte.  This is a primitive measure of
+// more than 8 repeats of any byte.  This is a (原始的測定)primitive measure of
 // entropy, but it works well enough.  The function keeps track of a
 // sliding window of byte counts.
 static int entropy(const uint8_t* bmap, size_t i)
@@ -139,12 +140,17 @@ static void print_progress(size_t percent)
 }
 
 static unsigned char AES_xtime(uint32_t x)
-{
+{   
+    // 条件演算子
 	return (x&0x80) ? (x<<1)^0x1b : x<<1;
 }
 
+// 普通のキースケジュールへと復号する最適化として，
+// InvMixColumnがプリ適応されたキースケジュールを変換
+// このコードは追加された拡張機能
 // converts a key schedule that's had InvMixColumn pre-applied as
 // an optimisation for decryption back to a normal key schedule
+// added code------------------------------------------------------
 static void unconvert_key(uint32_t *k, int rounds)
 {
     int i;
@@ -173,12 +179,13 @@ static void unconvert_key(uint32_t *k, int rounds)
 	*k++ =  ((a3 << 24) | (a2 << 16) | (a1 << 8) | a0);
     }
 }
-
+// added code------------------------------------------------------
 
 // The core key finding loop
 //
 // Searches for AES keys in memory image bmap with starting offsets up
 // to last; prints any keys found
+// bmapはunsigned char[]，これの中身は
 static void find_keys(const uint8_t* bmap, size_t last)
 {
     size_t percent = 0;
@@ -190,6 +197,7 @@ static void find_keys(const uint8_t* bmap, size_t last)
     for (size_t i = 0; i < last; i++) {
         if (entropy(bmap,i)) continue;
 
+        // uint32_t型のポインタにbmap[i]のアドレスをキャスト
         uint32_t* map = (uint32_t*)&(bmap[i]);
 
         // Check distance from 256-bit AES key
@@ -216,7 +224,8 @@ static void find_keys(const uint8_t* bmap, size_t last)
         }
         if (xor_count_256 <= gThreshold)
             print_key(map,256,i);
-
+    
+    // added code-----------------------------------------------
 	for(int tweaks = 0; tweaks < MAX_TWEAKS; tweaks++) {
 	    // Try various tweaks to how key schedule is storted
 	    uint32_t newmap[4*11];
@@ -229,9 +238,12 @@ static void find_keys(const uint8_t* bmap, size_t last)
 	    map = newmap;
 	    if(tweaks & TWEAK_INVMIXCOLUMN)
 		unconvert_key(map, 10);
+    // added code-----------------------------------------------
 
 	    // Check distance from 128-bit AES key
 	    int xor_count_128 = 0;
+        // rowがラウンド数と対応
+        // columnがkey長に対応？
 	    for (size_t row = 1; row < 11; row++) {
 		for (size_t column = 0; column < 4; column++) {
 		    if (column == 0)
@@ -265,6 +277,7 @@ static void find_keys(const uint8_t* bmap, size_t last)
     }
 }
 
+// ファイルオープン，ファイルのポインター，大きさを返す
 // Memory maps filename and return a pointer on success, setting len
 // to the length of the file (does not return on error)
 unsigned char *map_file(char *filename, size_t *len) {

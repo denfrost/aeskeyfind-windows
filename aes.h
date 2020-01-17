@@ -4,11 +4,14 @@
 typedef uint32_t aeskey_t[4];
 typedef uint32_t keyexp_t[44];
 
+// 置換表
 extern uint8_t sbox[255];
+// ラウンド定数
 extern uint8_t rcon[255];
 
-// Perform the AES key core operation on a word.
+// Perform the AES key core operation on a word.(word:AESの暗号化単位　1ワード= 4byte = 32bit)
 // (Assumes the standard byte order.)
+// key coreはkey expansionに対応？？？
 static inline uint32_t key_core(uint32_t k, int i) {
     uint32_t t = 0;
     for (int j=0; j<4; j++)

@@ -1,12 +1,13 @@
 #ifndef __UTIL_H__
 #define __UTIL_H__
 
-// Return bit n of vector.
+// Return bit n of vector.(1bit行の任意の場所のbitを返す)
 static inline int bit(uint32_t vector, int n) {
     return (vector >> n) & 1;
 }
 
-// Set byte n of vector to val.
+// Set byte n of vector to val.(1bit行のn番目に値をセット)
+// return setted vector.
 static inline uint32_t set_byte(uint32_t vector, int n, uint8_t val) {
 	return (vector & ~(0xFF << (8*n))) | (val << (8*n));
 }
@@ -21,7 +22,7 @@ extern const uint64_t m2; // binary: 00110011..
 extern const uint64_t m4; // binary:  4 zeros,  4 ones ...
 extern const uint64_t h01; // the sum of 256 to the power of 0,1,2,3...
 
-// Return the number of bits in x that are 1.
+// Return the number of bits in x that are 1.(A.K.A. bit count)
 static inline int popcount(uint64_t x) {
     x -= (x >> 1) & m1;         // put count of each 2 bits into those 2 bits
     x = (x & m2) + ((x >> 2) & m2); // put count of each 4 bits into those 4 bits
