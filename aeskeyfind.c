@@ -247,6 +247,7 @@ static void find_keys(const uint8_t* bmap, size_t last)
 	    for (size_t row = 1; row < 11; row++) {
 		for (size_t column = 0; column < 4; column++) {
 		    if (column == 0)
+            // ラウンドキーを作成して，xorを0になるようにして違反をカウント
 			xor_count_128 += popcount(key_core(map[4*row-1],row) ^
 						  map[4*(row-1)] ^
 						  map[4*row]);
