@@ -7,15 +7,19 @@
 #include <stdlib.h>
 #include <stdint.h>
 #include <sys/stat.h>
-#include <unistd.h>
+#include <windows.h>
 #include <fcntl.h>
-#include <sys/mman.h>
 #include <errno.h>
 #include <string.h>
+#include <wchar.h>
+//linux依存
+//#include <sys/mman.h>:mmap用
+//#include <unistd.h>:
+//#include <getopt.h>:コマンドライン操作
 
 extern char *optarg;
 extern int optind, opterr, optopt;
-#include <getopt.h>
+
 
 #ifdef __FreeBSD__
 #include <err.h>
@@ -25,6 +29,7 @@ extern int optind, opterr, optopt;
 
 #include "util.h"
 #include "aes.h"
+#include "getopt.h"
 
 #define DEFAULT_THRESHOLD 10
 static long int gThreshold = DEFAULT_THRESHOLD;
@@ -151,34 +156,34 @@ static unsigned char AES_xtime(uint32_t x)
 // converts a key schedule that's had InvMixColumn pre-applied as
 // an optimisation for decryption back to a normal key schedule
 // added code------------------------------------------------------
-static void unconvert_key(uint32_t *k, int rounds)
-{
-    int i;
-    uint32_t w, tmp1, old_a0, a0, a1, a2, a3;
-
-    k += 4;
-
-    for (i= rounds*4; i > 4; i--)
-    {
-        w= *k;
-
-	// note: a quirk of aeskeyfind is that the bytes are in
-	// reverse order within the word compared to normal AES
-	a3 = (uint32_t)((w>>24)&0xFF);
-	a2 = (uint32_t)((w>>16)&0xFF);
-	a1 = (uint32_t)((w>>8)&0xFF);
-	a0 = (uint32_t)(w&0xFF);
-
-	tmp1 = a0 ^ a1 ^ a2 ^ a3;
-	old_a0 = a0;
-	a0 ^= tmp1 ^ AES_xtime(a0 ^ a1);
-	a1 ^= tmp1 ^ AES_xtime(a1 ^ a2);
-	a2 ^= tmp1 ^ AES_xtime(a2 ^ a3);
-	a3 ^= tmp1 ^ AES_xtime(a3 ^ old_a0);
-
-	*k++ =  ((a3 << 24) | (a2 << 16) | (a1 << 8) | a0);
-    }
-}
+//static void unconvert_key(uint32_t *k, int rounds)
+//{
+//    int i;
+//    uint32_t w, tmp1, old_a0, a0, a1, a2, a3;
+//
+//    k += 4;
+//
+//    for (i= rounds*4; i > 4; i--)
+//    {
+//        w= *k;
+//
+//	// note: a quirk of aeskeyfind is that the bytes are in
+//	// reverse order within the word compared to normal AES
+//	a3 = (uint32_t)((w>>24)&0xFF);
+//	a2 = (uint32_t)((w>>16)&0xFF);
+//	a1 = (uint32_t)((w>>8)&0xFF);
+//	a0 = (uint32_t)(w&0xFF);
+//
+//	tmp1 = a0 ^ a1 ^ a2 ^ a3;
+//	old_a0 = a0;
+//	a0 ^= tmp1 ^ AES_xtime(a0 ^ a1);
+//	a1 ^= tmp1 ^ AES_xtime(a1 ^ a2);
+//	a2 ^= tmp1 ^ AES_xtime(a2 ^ a3);
+//	a3 ^= tmp1 ^ AES_xtime(a3 ^ old_a0);
+//
+//	*k++ =  ((a3 << 24) | (a2 << 16) | (a1 << 8) | a0);
+//    }
+//}
 // added code------------------------------------------------------
 
 // The core key finding loop
@@ -225,23 +230,23 @@ static void find_keys(const uint8_t* bmap, size_t last)
         if (xor_count_256 <= gThreshold)
             print_key(map,256,i);
     
+	//速度が低下するので除外
     // added code-----------------------------------------------
-	for(int tweaks = 0; tweaks < MAX_TWEAKS; tweaks++) {
-	    // Try various tweaks to how key schedule is storted
-	    uint32_t newmap[4*11];
-	    map = (uint32_t*)&(bmap[i]);
-	    if(tweaks & TWEAK_REVERSE_ORDER)
-		for (size_t row = 0; row < 11; row++)
-		    memcpy(newmap+4*row, map+4*(10-row), 4*sizeof(uint32_t));
-	    else
-		memcpy(newmap, map, 4*11*sizeof(uint32_t));
-	    map = newmap;
-	    if(tweaks & TWEAK_INVMIXCOLUMN)
-		unconvert_key(map, 10);
+	//for(int tweaks = 0; tweaks < MAX_TWEAKS; tweaks++) {
+	//    // Try various tweaks to how key schedule is storted
+	//    uint32_t newmap[4*11];
+	//    map = (uint32_t*)&(bmap[i]);
+	//    if(tweaks & TWEAK_REVERSE_ORDER)
+	//	for (size_t row = 0; row < 11; row++)
+	//	    memcpy(newmap+4*row, map+4*(10-row), 4*sizeof(uint32_t));
+	//    else
+	//	memcpy(newmap, map, 4*11*sizeof(uint32_t));
+	//    map = newmap;
+	//    if(tweaks & TWEAK_INVMIXCOLUMN)
+	//	unconvert_key(map, 10);
     // added code-----------------------------------------------
 
 	    // Check distance from 128-bit AES key
-	    int xor_count_128 = 0;
         // rowがラウンド数と対応
         // map[n]の型はuin32_t=4byte=32bit
         // columnがkey長に対応，4回確かめて128bit分の鍵であるか検証
@@ -253,6 +258,7 @@ static void find_keys(const uint8_t* bmap, size_t last)
         // (row番目ラウンド,column-1番目ワード)xor(row-1番目ラウンド,column番目ワード)xor(row番目ラウンド,column番目ワード)
         // Ex:  W4(1,0) xor W1(0,1) xor W5(1,1)
         // この式はラウンドキーがAESの定義通り実装されている場合0となる
+		int xor_count_128 = 0;
 	    for (size_t row = 1; row < 11; row++) {
 		for (size_t column = 0; column < 4; column++) {
 		    if (column == 0)
@@ -269,7 +275,7 @@ static void find_keys(const uint8_t* bmap, size_t last)
 	    }
 	    if (xor_count_128 < gThreshold)
 		print_key(map,128,i);
-	}
+	//}
 
         if (gProgress) {
             size_t pct = (increment > 0) ? i / increment : i * 100 / last;
@@ -287,24 +293,51 @@ static void find_keys(const uint8_t* bmap, size_t last)
 }
 
 // ファイルオープン，ファイルのポインター，大きさを返す
+//linux依存コード
 // Memory maps filename and return a pointer on success, setting len
 // to the length of the file (does not return on error)
-unsigned char *map_file(char *filename, size_t *len) {
-  int fd = open(filename, O_RDONLY);
-  if (fd < 0)
-    err(1, "image open failed");
+//unsigned char *map_file(char *filename, size_t *len) {
+//  int fd = open(filename, O_RDONLY);
+//  if (fd < 0)
+//    err(1, "image open failed");
+//
+//  struct stat st;
+//  if (fstat(fd, &st) != 0)
+//    err(1, "image fstat failed");
+//
+//  unsigned char *map;
+//  map = (unsigned char*)mmap(0, st.st_size, PROT_READ, MAP_SHARED, fd, 0);
+//  if (map == MAP_FAILED)
+//    err(1, "image mmap failed");
+//
+//  *len = st.st_size;
+//  return map;
+//}
 
-  struct stat st;
-  if (fstat(fd, &st) != 0)
-    err(1, "image fstat failed");
-
-  unsigned char *map;
-  map = (unsigned char*)mmap(0, st.st_size, PROT_READ, MAP_SHARED, fd, 0);
-  if (map == MAP_FAILED)
-    err(1, "image mmap failed");
-
-  *len = st.st_size;
-  return map;
+unsigned char* map_file(const char* filename, LONGLONG* len) {
+	HANDLE hFile = CreateFile(filename, GENERIC_READ, 0, NULL, OPEN_EXISTING, 0, NULL);
+	if (hFile == INVALID_HANDLE_VALUE)
+		err(1, "image open failed");
+	if (!GetFileSizeEx(hFile, len)) {
+		CloseHandle(hFile);
+		err(1, "get file_size failed");
+	}
+	HANDLE hMap = CreateFileMapping(hFile,NULL,PAGE_READONLY,0,0,"m_Image");
+	if (hMap == NULL) {
+		CloseHandle(hFile);
+		hFile = INVALID_HANDLE_VALUE;
+		err(1, "image mapping failed");
+	}
+	void* m_pPointer = (char*)MapViewOfFile(hMap, FILE_MAP_READ, 0, 0, 0);
+	if (m_pPointer == NULL) {
+		CloseHandle(hMap);
+		CloseHandle(hFile);
+		hMap = 0;
+		hFile = INVALID_HANDLE_VALUE;
+		err(1, "image mvof failed");
+	}
+	return m_pPointer;
+	
 }
 
 int main(int argc, char * argv[])
@@ -345,14 +378,18 @@ int main(int argc, char * argv[])
         usage();
         exit(1);
     }
-
-    size_t len;
+	
+    LONGLONG len;
     unsigned char *image = map_file(argv[0], &len);
-    if (len < 240) {
-        fprintf(stderr, "memory image too small\n");
-        exit(1);
-    }
-
+	//char *filename = "D:\\my_program\\medusa_unlocker\\medusa.dump";
+	//unsigned char* image = map_file(filename, &len);
+	printf("filesize:%lld",len);
+	puts("");
+	if (len < 240) {
+	fprintf(stderr, "memory image too small\n");
+	exit(1);
+	}
+	
     find_keys(image, len - 240);
 
     return 0;
