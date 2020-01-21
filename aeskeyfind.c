@@ -127,7 +127,7 @@ static int entropy(const uint8_t* bmap, size_t i)
 // Prints info about the program's command line options
 static void usage()
 {
-    fprintf(stderr, "Usage: aeskeyfind [OPTION]... MEMORY-IMAGE\n"
+    printf(stderr, "Usage: aeskeyfind [OPTION]... MEMORY-IMAGE\n"
 			"Locates scheduled 128-bit and 256-bit AES keys in MEMORY-IMAGE.\n"
 			"\n"
 			"\t-v\t\tverbose output -- prints the extended keys and \n"
@@ -141,7 +141,7 @@ static void usage()
 // Prints the progress to stderr
 static void print_progress(size_t percent)
 {
-    fprintf(stderr, "Keyfind progress: %zu%%\r", percent);
+    printf(stderr, "Keyfind progress: %zu%%\r", percent);
 }
 
 static unsigned char AES_xtime(uint32_t x)
@@ -278,17 +278,19 @@ static void find_keys(const uint8_t* bmap, size_t last)
 	//}
 
         if (gProgress) {
-            size_t pct = (increment > 0) ? i / increment : i * 100 / last;
+            int pct = (increment > 0) ? i / increment : i * 100 / last;
             if (pct > percent) {
                 percent = pct;
-                print_progress(percent);
+				printf("progress:%d%\n", percent);
+                //print_progress(percent);
             }
         }
     }
 
     if (gProgress) {
-        print_progress(100);
-        fprintf(stderr, "\n");
+		printf("progress:100%\n");
+        //print_progress(100);
+        printf(stderr, "\n");
     }
 }
 
@@ -341,7 +343,8 @@ unsigned char* map_file(const char* filename, LONGLONG* len) {
 }
 
 int main(int argc, char * argv[])
-{
+{	
+	setvbuf(stdout, (char*)NULL, _IONBF, 0);
     int ch = -1;
     while ((ch = getopt(argc, argv, "hvqt:")) != -1) {
         switch(ch) {
@@ -357,7 +360,7 @@ int main(int argc, char * argv[])
                     char* endptr = NULL;
                     gThreshold = strtol(optarg, &endptr, 10);
                     if (gThreshold < 0 || errno != 0 || endptr == optarg) {
-                        fprintf(stderr, "invalid threshold\n");
+                        printf(stderr, "invalid threshold\n");
                         usage();
                         exit(1);
                     }
@@ -386,7 +389,7 @@ int main(int argc, char * argv[])
 	printf("filesize:%lld",len);
 	puts("");
 	if (len < 240) {
-	fprintf(stderr, "memory image too small\n");
+	printf(stderr, "memory image too small\n");
 	exit(1);
 	}
 	
