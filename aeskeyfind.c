@@ -243,11 +243,19 @@ static void find_keys(const uint8_t* bmap, size_t last)
 	    // Check distance from 128-bit AES key
 	    int xor_count_128 = 0;
         // rowがラウンド数と対応
-        // columnがkey長に対応？
+        // map[n]の型はuin32_t=4byte=32bit
+        // columnがkey長に対応，4回確かめて128bit分の鍵であるか検証
+        // columnが0のときは先頭ワードであり，特別な置換が行われているから条件分けされている
+        // key_core(map[4*row-1],row):先頭ワード用のrow-1番目のラウンドキー(map[4*row-1]とする)
+        // から作成したrow番目のラウンドキー
+        // map[4*(row-1)]:row-1番目のラウンドキー(32bit)
+        // map[4*row]:row番目のラウンドキー(32bit)
+        // (row番目ラウンド,column-1番目ワード)xor(row-1番目ラウンド,column番目ワード)xor(row番目ラウンド,column番目ワード)
+        // Ex:  W4(1,0) xor W1(0,1) xor W5(1,1)
+        // この式はラウンドキーがAESの定義通り実装されている場合0となる
 	    for (size_t row = 1; row < 11; row++) {
 		for (size_t column = 0; column < 4; column++) {
 		    if (column == 0)
-            // ラウンドキーを作成して，xorを0になるようにして違反をカウント
 			xor_count_128 += popcount(key_core(map[4*row-1],row) ^
 						  map[4*(row-1)] ^
 						  map[4*row]);

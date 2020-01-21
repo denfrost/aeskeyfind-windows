@@ -11,7 +11,8 @@ extern uint8_t rcon[255];
 
 // Perform the AES key core operation on a word.(word:AESの暗号化単位　1ワード= 4byte = 32bit)
 // (Assumes the standard byte order.)
-// key coreはkey expansionに対応？？？たぶん，与えられた仮の鍵からラウンドキーを作成して戻している
+// key coreはkey expansionに対応？？？たぶん，与えられた仮の鍵からi番目ラウンドキーを作成して戻している
+// 先頭ワード用の特別な置換方法用の関数
 static inline uint32_t key_core(uint32_t k, int i) {
     uint32_t t = 0;
     for (int j=0; j<4; j++)
